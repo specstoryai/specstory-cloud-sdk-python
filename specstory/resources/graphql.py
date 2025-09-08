@@ -1,6 +1,6 @@
 """GraphQL resource implementation"""
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
 from ._base import BaseResource, AsyncBaseResource
 
@@ -47,11 +47,11 @@ class GraphQL(BaseResource):
             }
         )
         
-        return response.get("data", {}).get("searchSessions", {})
+        return cast(Dict[str, Any], response.get("data", {}).get("searchSessions", {}))
     
     def query(self, query: str, variables: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Execute a raw GraphQL query"""
-        return self._request(
+        result = self._request(
             method="POST",
             path="/api/v1/graphql",
             body={
@@ -59,6 +59,7 @@ class GraphQL(BaseResource):
                 "variables": variables or {}
             }
         )
+        return cast(Dict[str, Any], result)
 
 
 class AsyncGraphQL(AsyncBaseResource):
@@ -103,11 +104,11 @@ class AsyncGraphQL(AsyncBaseResource):
             }
         )
         
-        return response.get("data", {}).get("searchSessions", {})
+        return cast(Dict[str, Any], response.get("data", {}).get("searchSessions", {}))
     
     async def query(self, query: str, variables: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Execute a raw GraphQL query"""
-        return await self._request(
+        result = await self._request(
             method="POST",
             path="/api/v1/graphql",
             body={
@@ -115,3 +116,4 @@ class AsyncGraphQL(AsyncBaseResource):
                 "variables": variables or {}
             }
         )
+        return cast(Dict[str, Any], result)

@@ -1,7 +1,7 @@
 """SpecStory Client for API interaction"""
 
 import os
-from typing import Optional
+from typing import Optional, Any
 
 from ._http import HTTPClient, AsyncHTTPClient
 from .resources.projects import Projects, AsyncProjects
@@ -68,5 +68,5 @@ class AsyncClient:
         await self._http.__aenter__()
         return self
     
-    async def __aexit__(self, *args) -> None:
+    async def __aexit__(self, *args: Any) -> None:
         await self._http.__aexit__(*args)

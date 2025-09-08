@@ -1,8 +1,19 @@
 """Sessions resource implementation"""
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, AsyncGenerator
+from uuid import UUID
 
 from ._base import BaseResource, AsyncBaseResource
+from ..types_generated import (
+    SessionSummary,
+    SessionDetail,
+    ListSessionsResponse,
+    WriteSessionRequest,
+    WriteSessionResponse,
+    SessionDetailResponse,
+    DeleteSessionResponse,
+    SessionMetadata,
+)
 
 
 class Sessions(BaseResource):
@@ -11,60 +22,219 @@ class Sessions(BaseResource):
     def write(
         self,
         project_id: str,
-        name: str,
+        *,
         markdown: str,
         raw_data: str,
-        metadata: Optional[Dict[str, Any]] = None,
+        name: str,
         project_name: Optional[str] = None,
-        idempotency_key: Optional[str] = None
+        metadata: Optional[SessionMetadata] = None,
+        idempotency_key: Optional[str] = None,
+        timeout_ms: Optional[int] = None
     ) -> Dict[str, Any]:
-        """Write a new session"""
-        # TODO: Add proper types after generation
-        body = {
-            "name": name,
-            "markdown": markdown,
-            "rawData": raw_data,
-        }
+        """Write (create or update) a session
         
-        if metadata:
-            body["metadata"] = metadata
+        Args:
+            project_id: The project ID
+            markdown: Session markdown content
+            raw_data: Raw session data
+            name: Session name
+            project_name: Project name (defaults to session name)
+            metadata: Optional session metadata
+            idempotency_key: Optional idempotency key for request
+            timeout_ms: Optional timeout override
+            
+        Returns:
+            Dictionary with session ID, project ID, created_at, and optional ETag
+        """
+        # Build request body
+        body = WriteSessionRequest(
+            projectName=project_name or name,
+            markdown=markdown,
+            rawData=raw_data,
+            name=name,
+            metadata=metadata
+        ).model_dump(exclude_none=True)
         
-        if project_name:
-            body["projectName"] = project_name
-        
-        return self._request(
+        response, headers = self._request_with_headers(
             method="PUT",
             path=f"/api/v1/projects/{project_id}/sessions",
             body=body,
-            idempotency_key=idempotency_key
+            idempotency_key=idempotency_key,
+            timeout_ms=timeout_ms
         )
+        
+        # Parse response
+        parsed = WriteSessionResponse.model_validate(response)
+        result = {
+            "session_id": parsed.data.sessionId,
+            "project_id": parsed.data.projectId,
+            "created_at": parsed.data.createdAt.isoformat()
+        }
+        
+        # Add ETag if available
+        if "etag" in headers:
+            result["etag"] = headers["etag"]
+            
+        return result
     
-    def list(self, project_id: str) -> List[Dict[str, Any]]:
-        """List sessions for a project"""
-        # TODO: Add proper types after generation
+    def list(
+        self,
+        project_id: str,
+        *,
+        page_size: Optional[int] = None,
+        page_token: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """List sessions for a project
+        
+        Args:
+            project_id: The project ID
+            page_size: Optional page size (not implemented yet)
+            page_token: Optional page token (not implemented yet)
+            
+        Returns:
+            List of session summaries with ETags
+        """
         response = self._request(
             method="GET",
             path=f"/api/v1/projects/{project_id}/sessions"
         )
-        return response.get("data", {}).get("sessions", [])
+        
+        # Parse response
+        parsed = ListSessionsResponse.model_validate(response)
+        return [session.model_dump() for session in parsed.data.sessions]
+    
+    def list_paginated(
+        self,
+        project_id: str,
+        *,
+        page_size: Optional[int] = None
+    ) -> Any:
+        """List sessions with pagination (generator)
+        
+        Args:
+            project_id: The project ID
+            page_size: Optional page size (not implemented yet)
+            
+        Yields:
+            Session summaries one by one
+        """
+        # For now, yield all sessions at once
+        # TODO: Implement proper cursor-based pagination when API supports it
+        sessions = self.list(project_id, page_size=page_size)
+        for session in sessions:
+            yield session
     
     def read(
         self,
         project_id: str,
         session_id: str,
+        *,
         if_none_match: Optional[str] = None
-    ) -> Dict[str, Any]:
-        """Read a session"""
-        # TODO: Add proper types after generation
+    ) -> Optional[Dict[str, Any]]:
+        """Read a specific session
+        
+        Args:
+            project_id: The project ID
+            session_id: The session ID
+            if_none_match: Optional ETag for conditional request
+            
+        Returns:
+            Session details with optional ETag, or None if not modified
+        """
+        headers = {"Accept": "application/json"}
+        if if_none_match:
+            headers["If-None-Match"] = if_none_match
+        
+        try:
+            response, response_headers = self._request_with_headers(
+                method="GET",
+                path=f"/api/v1/projects/{project_id}/sessions/{session_id}",
+                headers=headers
+            )
+            
+            # Parse response
+            parsed = SessionDetailResponse.model_validate(response)
+            result = parsed.data.session.model_dump()
+            
+            # Add ETag if available
+            if "etag" in response_headers:
+                result["etag"] = response_headers["etag"]
+                
+            return result
+            
+        except Exception as e:
+            # Return None for 304 Not Modified
+            if hasattr(e, "status_code") and e.status_code == 304:
+                return None
+            raise
+    
+    def delete(self, project_id: str, session_id: str) -> bool:
+        """Delete a session
+        
+        Args:
+            project_id: The project ID
+            session_id: The session ID
+            
+        Returns:
+            True if successful
+        """
+        response = self._request(
+            method="DELETE",
+            path=f"/api/v1/projects/{project_id}/sessions/{session_id}"
+        )
+        
+        # Parse response
+        parsed = DeleteSessionResponse.model_validate(response)
+        return parsed.success
+    
+    def head(
+        self,
+        project_id: str,
+        session_id: str,
+        *,
+        if_none_match: Optional[str] = None
+    ) -> Optional[Dict[str, Any]]:
+        """Get session metadata without content
+        
+        Args:
+            project_id: The project ID
+            session_id: The session ID
+            if_none_match: Optional ETag for conditional request
+            
+        Returns:
+            Dictionary with metadata or None if not modified
+        """
         headers = {}
         if if_none_match:
             headers["If-None-Match"] = if_none_match
         
-        return self._request(
-            method="GET",
-            path=f"/api/v1/projects/{project_id}/sessions/{session_id}",
-            headers=headers if headers else None
-        )
+        try:
+            response, response_headers = self._request_with_headers(
+                method="HEAD",
+                path=f"/api/v1/projects/{project_id}/sessions/{session_id}",
+                headers=headers
+            )
+            
+            return {
+                "exists": True,
+                "etag": response_headers.get("etag"),
+                "content_length": int(response_headers["content-length"])
+                if "content-length" in response_headers else None,
+                "last_modified": response_headers.get("last-modified"),
+                "markdown_size": int(response_headers["x-markdown-size"])
+                if "x-markdown-size" in response_headers else None,
+                "raw_data_size": int(response_headers["x-raw-data-size"])
+                if "x-raw-data-size" in response_headers else None,
+            }
+            
+        except Exception as e:
+            # Return None for 304 Not Modified
+            if hasattr(e, "status_code") and e.status_code == 304:
+                return None
+            # Return exists: False for 404
+            if hasattr(e, "status_code") and e.status_code == 404:
+                return {"exists": False}
+            raise
 
 
 class AsyncSessions(AsyncBaseResource):
@@ -73,57 +243,216 @@ class AsyncSessions(AsyncBaseResource):
     async def write(
         self,
         project_id: str,
-        name: str,
+        *,
         markdown: str,
         raw_data: str,
-        metadata: Optional[Dict[str, Any]] = None,
+        name: str,
         project_name: Optional[str] = None,
-        idempotency_key: Optional[str] = None
+        metadata: Optional[SessionMetadata] = None,
+        idempotency_key: Optional[str] = None,
+        timeout_ms: Optional[int] = None
     ) -> Dict[str, Any]:
-        """Write a new session"""
-        # TODO: Add proper types after generation
-        body = {
-            "name": name,
-            "markdown": markdown,
-            "rawData": raw_data,
-        }
+        """Write (create or update) a session
         
-        if metadata:
-            body["metadata"] = metadata
+        Args:
+            project_id: The project ID
+            markdown: Session markdown content
+            raw_data: Raw session data
+            name: Session name
+            project_name: Project name (defaults to session name)
+            metadata: Optional session metadata
+            idempotency_key: Optional idempotency key for request
+            timeout_ms: Optional timeout override
+            
+        Returns:
+            Dictionary with session ID, project ID, created_at, and optional ETag
+        """
+        # Build request body
+        body = WriteSessionRequest(
+            projectName=project_name or name,
+            markdown=markdown,
+            rawData=raw_data,
+            name=name,
+            metadata=metadata
+        ).model_dump(exclude_none=True)
         
-        if project_name:
-            body["projectName"] = project_name
-        
-        return await self._request(
+        response, headers = await self._request_with_headers(
             method="PUT",
             path=f"/api/v1/projects/{project_id}/sessions",
             body=body,
-            idempotency_key=idempotency_key
+            idempotency_key=idempotency_key,
+            timeout_ms=timeout_ms
         )
+        
+        # Parse response
+        parsed = WriteSessionResponse.model_validate(response)
+        result = {
+            "session_id": parsed.data.sessionId,
+            "project_id": parsed.data.projectId,
+            "created_at": parsed.data.createdAt.isoformat()
+        }
+        
+        # Add ETag if available
+        if "etag" in headers:
+            result["etag"] = headers["etag"]
+            
+        return result
     
-    async def list(self, project_id: str) -> List[Dict[str, Any]]:
-        """List sessions for a project"""
-        # TODO: Add proper types after generation
+    async def list(
+        self,
+        project_id: str,
+        *,
+        page_size: Optional[int] = None,
+        page_token: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """List sessions for a project
+        
+        Args:
+            project_id: The project ID
+            page_size: Optional page size (not implemented yet)
+            page_token: Optional page token (not implemented yet)
+            
+        Returns:
+            List of session summaries with ETags
+        """
         response = await self._request(
             method="GET",
             path=f"/api/v1/projects/{project_id}/sessions"
         )
-        return response.get("data", {}).get("sessions", [])
+        
+        # Parse response
+        parsed = ListSessionsResponse.model_validate(response)
+        return [session.model_dump() for session in parsed.data.sessions]
+    
+    async def list_paginated(
+        self,
+        project_id: str,
+        *,
+        page_size: Optional[int] = None
+    ) -> AsyncGenerator[Dict[str, Any], None]:
+        """List sessions with pagination (async generator)
+        
+        Args:
+            project_id: The project ID
+            page_size: Optional page size (not implemented yet)
+            
+        Yields:
+            Session summaries one by one
+        """
+        # For now, yield all sessions at once
+        # TODO: Implement proper cursor-based pagination when API supports it
+        sessions = await self.list(project_id, page_size=page_size)
+        for session in sessions:
+            yield session
     
     async def read(
         self,
         project_id: str,
         session_id: str,
+        *,
         if_none_match: Optional[str] = None
-    ) -> Dict[str, Any]:
-        """Read a session"""
-        # TODO: Add proper types after generation
+    ) -> Optional[Dict[str, Any]]:
+        """Read a specific session
+        
+        Args:
+            project_id: The project ID
+            session_id: The session ID
+            if_none_match: Optional ETag for conditional request
+            
+        Returns:
+            Session details with optional ETag, or None if not modified
+        """
+        headers = {"Accept": "application/json"}
+        if if_none_match:
+            headers["If-None-Match"] = if_none_match
+        
+        try:
+            response, response_headers = await self._request_with_headers(
+                method="GET",
+                path=f"/api/v1/projects/{project_id}/sessions/{session_id}",
+                headers=headers
+            )
+            
+            # Parse response
+            parsed = SessionDetailResponse.model_validate(response)
+            result = parsed.data.session.model_dump()
+            
+            # Add ETag if available
+            if "etag" in response_headers:
+                result["etag"] = response_headers["etag"]
+                
+            return result
+            
+        except Exception as e:
+            # Return None for 304 Not Modified
+            if hasattr(e, "status_code") and e.status_code == 304:
+                return None
+            raise
+    
+    async def delete(self, project_id: str, session_id: str) -> bool:
+        """Delete a session
+        
+        Args:
+            project_id: The project ID
+            session_id: The session ID
+            
+        Returns:
+            True if successful
+        """
+        response = await self._request(
+            method="DELETE",
+            path=f"/api/v1/projects/{project_id}/sessions/{session_id}"
+        )
+        
+        # Parse response
+        parsed = DeleteSessionResponse.model_validate(response)
+        return parsed.success
+    
+    async def head(
+        self,
+        project_id: str,
+        session_id: str,
+        *,
+        if_none_match: Optional[str] = None
+    ) -> Optional[Dict[str, Any]]:
+        """Get session metadata without content
+        
+        Args:
+            project_id: The project ID
+            session_id: The session ID
+            if_none_match: Optional ETag for conditional request
+            
+        Returns:
+            Dictionary with metadata or None if not modified
+        """
         headers = {}
         if if_none_match:
             headers["If-None-Match"] = if_none_match
         
-        return await self._request(
-            method="GET",
-            path=f"/api/v1/projects/{project_id}/sessions/{session_id}",
-            headers=headers if headers else None
-        )
+        try:
+            response, response_headers = await self._request_with_headers(
+                method="HEAD",
+                path=f"/api/v1/projects/{project_id}/sessions/{session_id}",
+                headers=headers
+            )
+            
+            return {
+                "exists": True,
+                "etag": response_headers.get("etag"),
+                "content_length": int(response_headers["content-length"])
+                if "content-length" in response_headers else None,
+                "last_modified": response_headers.get("last-modified"),
+                "markdown_size": int(response_headers["x-markdown-size"])
+                if "x-markdown-size" in response_headers else None,
+                "raw_data_size": int(response_headers["x-raw-data-size"])
+                if "x-raw-data-size" in response_headers else None,
+            }
+            
+        except Exception as e:
+            # Return None for 304 Not Modified
+            if hasattr(e, "status_code") and e.status_code == 304:
+                return None
+            # Return exists: False for 404
+            if hasattr(e, "status_code") and e.status_code == 404:
+                return {"exists": False}
+            raise

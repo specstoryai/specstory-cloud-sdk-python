@@ -26,7 +26,7 @@ def generate_types():
         "datamodel-codegen",
         "--input", str(OPENAPI_PATH),
         "--output", str(OUTPUT_PATH),
-        "--target-python-version", "3.8",
+        "--target-python-version", "3.9",
         "--use-union-operator",  # Use | instead of Union
         "--field-constraints",    # Add field constraints
         "--use-default",         # Use default values
