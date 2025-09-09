@@ -261,9 +261,11 @@ class Sessions(BaseResource):
             params=params
         )
         
-        # Parse response
-        parsed = ListSessionsResponse.model_validate(response)
-        return [session.model_dump() for session in parsed.data.sessions]
+        # The recent endpoint returns just the sessions array directly
+        if isinstance(response, dict) and "sessions" in response:
+            return response["sessions"]
+        # Fallback for unexpected format
+        return response
 
 
 class AsyncSessions(AsyncBaseResource):
@@ -511,6 +513,8 @@ class AsyncSessions(AsyncBaseResource):
             params=params
         )
         
-        # Parse response
-        parsed = ListSessionsResponse.model_validate(response)
-        return [session.model_dump() for session in parsed.data.sessions]
+        # The recent endpoint returns just the sessions array directly
+        if isinstance(response, dict) and "sessions" in response:
+            return response["sessions"]
+        # Fallback for unexpected format
+        return response

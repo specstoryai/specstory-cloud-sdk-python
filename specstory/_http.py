@@ -8,7 +8,13 @@ from typing import Optional, Dict, Any, Union, TypeVar, Literal, Tuple
 
 import httpx
 
-from ._errors import SDKError
+from ._errors import (
+    SDKError, 
+    NetworkError, 
+    TimeoutError, 
+    ErrorContext
+)
+from datetime import datetime
 from ._constants import (
     SDK_VERSION,
     SDK_LANGUAGE,
@@ -26,11 +32,32 @@ Method = Literal["GET", "POST", "PUT", "DELETE", "HEAD", "PATCH"]
 class HTTPClient:
     """Synchronous HTTP client with retry logic"""
     
-    def __init__(self, api_key: str, base_url: str, timeout_s: float) -> None:
+    def __init__(self, api_key: str, base_url: str, timeout_s: float, 
+                 max_connections: int = 100, max_keepalive_connections: int = 20) -> None:
         self.api_key = api_key
         self.base_url = base_url
         self.timeout_s = timeout_s
-        self.client = httpx.Client(timeout=timeout_s)
+        self._request_cache: Dict[str, Any] = {}
+        
+        # Configure connection pooling
+        limits = httpx.Limits(
+            max_connections=max_connections,
+            max_keepalive_connections=max_keepalive_connections,
+            keepalive_expiry=30.0
+        )
+        # Try to enable HTTP/2 if available
+        try:
+            self.client = httpx.Client(
+                timeout=timeout_s,
+                limits=limits,
+                http2=True
+            )
+        except ImportError:
+            # Fallback to HTTP/1.1 if h2 package is not installed
+            self.client = httpx.Client(
+                timeout=timeout_s,
+                limits=limits
+            )
     
     def request(
         self,
@@ -41,11 +68,22 @@ class HTTPClient:
         timeout_s: Optional[float] = None,
         idempotency_key: Optional[str] = None,
         retries: Optional[int] = None,
+        params: Optional[Dict[str, str]] = None,
     ) -> Any:
         """Make HTTP request with retry logic"""
         url = f"{self.base_url}{path}"
         timeout = timeout_s or self.timeout_s
         max_retries = retries if retries is not None else DEFAULT_MAX_RETRIES
+        start_time = time.time()
+        
+        # Request deduplication for GET requests
+        if method == "GET":
+            cache_key = f"{method}:{url}"
+            if cache_key in self._request_cache:
+                # Return cached response if available
+                cached = self._request_cache[cache_key]
+                if time.time() - cached["timestamp"] < 1.0:  # 1 second cache
+                    return cached["data"]
         
         request_headers = {
             "Authorization": f"Bearer {self.api_key}",
@@ -68,15 +106,29 @@ class HTTPClient:
                 response = self.client.request(
                     method=method,
                     url=url,
-                    json=body,
+                    json=body if body is not None else None,
                     headers=request_headers,
                     timeout=timeout,
+                    params=params,
                 )
                 
                 request_id = response.headers.get("x-request-id")
                 
                 if response.status_code >= 400:
-                    error = SDKError.from_response(response.status_code, request_id)
+                    context = ErrorContext(
+                        method=method,
+                        url=url,
+                        timestamp=datetime.now(),
+                        duration_ms=int((time.time() - start_time) * 1000),
+                        retry_count=attempt
+                    )
+                    retry_after = response.headers.get("retry-after")
+                    error = SDKError.from_response(
+                        response.status_code, 
+                        request_id, 
+                        context,
+                        retry_after
+                    )
                     
                     # Retry logic
                     if (
@@ -102,7 +154,17 @@ class HTTPClient:
                         "status": response.status_code,
                     }
                 
-                return response.json()
+                result = response.json()
+                
+                # Cache successful GET responses
+                if method == "GET" and response.status_code == 200:
+                    cache_key = f"{method}:{url}"
+                    self._request_cache[cache_key] = {
+                        "data": result,
+                        "timestamp": time.time()
+                    }
+                
+                return result
                 
             except httpx.RequestError as e:
                 last_error = e
@@ -111,16 +173,38 @@ class HTTPClient:
                     self._sleep_with_backoff(attempt)
                     continue
                 
-                raise SDKError(
+                context = ErrorContext(
+                    method=method,
+                    url=url,
+                    timestamp=datetime.now(),
+                    duration_ms=int((time.time() - start_time) * 1000),
+                    retry_count=attempt
+                )
+                
+                # Check if it's a timeout error
+                if isinstance(e, httpx.TimeoutException):
+                    raise TimeoutError(
+                        f"Request timed out after {timeout}s",
+                        int(timeout * 1000),
+                        context
+                    )
+                
+                raise NetworkError(
                     f"Request failed: {str(e)}",
-                    code="network_error",
-                    details={"original_error": str(e)},
+                    e,
+                    context
                 )
         
-        raise SDKError(
+        raise NetworkError(
             f"Request failed after {max_retries + 1} attempts",
-            code="max_retries_exceeded",
-            details={"last_error": str(last_error) if last_error else None},
+            last_error,
+            ErrorContext(
+                method=method,
+                url=url,
+                timestamp=datetime.now(),
+                duration_ms=int((time.time() - start_time) * 1000),
+                retry_count=max_retries + 1
+            )
         )
     
     def request_with_headers(
@@ -132,11 +216,13 @@ class HTTPClient:
         timeout_s: Optional[float] = None,
         idempotency_key: Optional[str] = None,
         retries: Optional[int] = None,
+        params: Optional[Dict[str, str]] = None,
     ) -> Tuple[Any, Dict[str, str]]:
         """Make HTTP request with retry logic and return response with headers"""
         url = f"{self.base_url}{path}"
         timeout = timeout_s or self.timeout_s
         max_retries = retries if retries is not None else DEFAULT_MAX_RETRIES
+        start_time = time.time()
         
         request_headers = {
             "Authorization": f"Bearer {self.api_key}",
@@ -159,15 +245,29 @@ class HTTPClient:
                 response = self.client.request(
                     method=method,
                     url=url,
-                    json=body,
+                    json=body if body is not None else None,
                     headers=request_headers,
                     timeout=timeout,
+                    params=params,
                 )
                 
                 request_id = response.headers.get("x-request-id")
                 
                 if response.status_code >= 400:
-                    error = SDKError.from_response(response.status_code, request_id)
+                    context = ErrorContext(
+                        method=method,
+                        url=url,
+                        timestamp=datetime.now(),
+                        duration_ms=int((time.time() - start_time) * 1000),
+                        retry_count=attempt
+                    )
+                    retry_after = response.headers.get("retry-after")
+                    error = SDKError.from_response(
+                        response.status_code, 
+                        request_id, 
+                        context,
+                        retry_after
+                    )
                     
                     # Retry logic
                     if (
@@ -204,16 +304,38 @@ class HTTPClient:
                     self._sleep_with_backoff(attempt)
                     continue
                 
-                raise SDKError(
+                context = ErrorContext(
+                    method=method,
+                    url=url,
+                    timestamp=datetime.now(),
+                    duration_ms=int((time.time() - start_time) * 1000),
+                    retry_count=attempt
+                )
+                
+                # Check if it's a timeout error
+                if isinstance(e, httpx.TimeoutException):
+                    raise TimeoutError(
+                        f"Request timed out after {timeout}s",
+                        int(timeout * 1000),
+                        context
+                    )
+                
+                raise NetworkError(
                     f"Request failed: {str(e)}",
-                    code="network_error",
-                    details={"original_error": str(e)},
+                    e,
+                    context
                 )
         
-        raise SDKError(
+        raise NetworkError(
             f"Request failed after {max_retries + 1} attempts",
-            code="max_retries_exceeded",
-            details={"last_error": str(last_error) if last_error else None},
+            last_error,
+            ErrorContext(
+                method=method,
+                url=url,
+                timestamp=datetime.now(),
+                duration_ms=int((time.time() - start_time) * 1000),
+                retry_count=max_retries + 1
+            )
         )
     
     def _should_retry(self, method: str) -> bool:
@@ -234,10 +356,14 @@ class HTTPClient:
 class AsyncHTTPClient:
     """Asynchronous HTTP client with retry logic"""
     
-    def __init__(self, api_key: str, base_url: str, timeout_s: float) -> None:
+    def __init__(self, api_key: str, base_url: str, timeout_s: float,
+                 max_connections: int = 100, max_keepalive_connections: int = 20) -> None:
         self.api_key = api_key
         self.base_url = base_url
         self.timeout_s = timeout_s
+        self._request_cache: Dict[str, Any] = {}
+        self._max_connections = max_connections
+        self._max_keepalive_connections = max_keepalive_connections
         self.client: Optional[httpx.AsyncClient] = None
     
     async def request(
@@ -249,14 +375,33 @@ class AsyncHTTPClient:
         timeout_s: Optional[float] = None,
         idempotency_key: Optional[str] = None,
         retries: Optional[int] = None,
+        params: Optional[Dict[str, str]] = None,
     ) -> Any:
         """Make async HTTP request with retry logic"""
         if not self.client:
-            self.client = httpx.AsyncClient(timeout=self.timeout_s)
+            limits = httpx.Limits(
+                max_connections=self._max_connections,
+                max_keepalive_connections=self._max_keepalive_connections,
+                keepalive_expiry=30.0
+            )
+            # Try to enable HTTP/2 if available
+            try:
+                self.client = httpx.AsyncClient(
+                    timeout=self.timeout_s,
+                    limits=limits,
+                    http2=True
+                )
+            except ImportError:
+                # Fallback to HTTP/1.1 if h2 package is not installed
+                self.client = httpx.AsyncClient(
+                    timeout=self.timeout_s,
+                    limits=limits
+                )
         
         url = f"{self.base_url}{path}"
         timeout = timeout_s or self.timeout_s
         max_retries = retries if retries is not None else DEFAULT_MAX_RETRIES
+        start_time = time.time()
         
         request_headers = {
             "Authorization": f"Bearer {self.api_key}",
@@ -279,15 +424,29 @@ class AsyncHTTPClient:
                 response = await self.client.request(
                     method=method,
                     url=url,
-                    json=body,
+                    json=body if body is not None else None,
                     headers=request_headers,
                     timeout=timeout,
+                    params=params,
                 )
                 
                 request_id = response.headers.get("x-request-id")
                 
                 if response.status_code >= 400:
-                    error = SDKError.from_response(response.status_code, request_id)
+                    context = ErrorContext(
+                        method=method,
+                        url=url,
+                        timestamp=datetime.now(),
+                        duration_ms=int((time.time() - start_time) * 1000),
+                        retry_count=attempt
+                    )
+                    retry_after = response.headers.get("retry-after")
+                    error = SDKError.from_response(
+                        response.status_code, 
+                        request_id, 
+                        context,
+                        retry_after
+                    )
                     
                     # Retry logic
                     if (
@@ -313,7 +472,17 @@ class AsyncHTTPClient:
                         "status": response.status_code,
                     }
                 
-                return response.json()
+                result = response.json()
+                
+                # Cache successful GET responses
+                if method == "GET" and response.status_code == 200:
+                    cache_key = f"{method}:{url}"
+                    self._request_cache[cache_key] = {
+                        "data": result,
+                        "timestamp": time.time()
+                    }
+                
+                return result
                 
             except httpx.RequestError as e:
                 last_error = e
@@ -328,10 +497,16 @@ class AsyncHTTPClient:
                     details={"original_error": str(e)},
                 )
         
-        raise SDKError(
+        raise NetworkError(
             f"Request failed after {max_retries + 1} attempts",
-            code="max_retries_exceeded",
-            details={"last_error": str(last_error) if last_error else None},
+            last_error,
+            ErrorContext(
+                method=method,
+                url=url,
+                timestamp=datetime.now(),
+                duration_ms=int((time.time() - start_time) * 1000),
+                retry_count=max_retries + 1
+            )
         )
     
     async def request_with_headers(
@@ -346,7 +521,24 @@ class AsyncHTTPClient:
     ) -> Tuple[Any, Dict[str, str]]:
         """Make async HTTP request with retry logic and return response with headers"""
         if not self.client:
-            self.client = httpx.AsyncClient(timeout=self.timeout_s)
+            limits = httpx.Limits(
+                max_connections=self._max_connections,
+                max_keepalive_connections=self._max_keepalive_connections,
+                keepalive_expiry=30.0
+            )
+            # Try to enable HTTP/2 if available
+            try:
+                self.client = httpx.AsyncClient(
+                    timeout=self.timeout_s,
+                    limits=limits,
+                    http2=True
+                )
+            except ImportError:
+                # Fallback to HTTP/1.1 if h2 package is not installed
+                self.client = httpx.AsyncClient(
+                    timeout=self.timeout_s,
+                    limits=limits
+                )
         
         url = f"{self.base_url}{path}"
         timeout = timeout_s or self.timeout_s
@@ -373,15 +565,29 @@ class AsyncHTTPClient:
                 response = await self.client.request(
                     method=method,
                     url=url,
-                    json=body,
+                    json=body if body is not None else None,
                     headers=request_headers,
                     timeout=timeout,
+                    params=params,
                 )
                 
                 request_id = response.headers.get("x-request-id")
                 
                 if response.status_code >= 400:
-                    error = SDKError.from_response(response.status_code, request_id)
+                    context = ErrorContext(
+                        method=method,
+                        url=url,
+                        timestamp=datetime.now(),
+                        duration_ms=int((time.time() - start_time) * 1000),
+                        retry_count=attempt
+                    )
+                    retry_after = response.headers.get("retry-after")
+                    error = SDKError.from_response(
+                        response.status_code, 
+                        request_id, 
+                        context,
+                        retry_after
+                    )
                     
                     # Retry logic
                     if (
@@ -424,10 +630,16 @@ class AsyncHTTPClient:
                     details={"original_error": str(e)},
                 )
         
-        raise SDKError(
+        raise NetworkError(
             f"Request failed after {max_retries + 1} attempts",
-            code="max_retries_exceeded",
-            details={"last_error": str(last_error) if last_error else None},
+            last_error,
+            ErrorContext(
+                method=method,
+                url=url,
+                timestamp=datetime.now(),
+                duration_ms=int((time.time() - start_time) * 1000),
+                retry_count=max_retries + 1
+            )
         )
     
     def _should_retry(self, method: str) -> bool:

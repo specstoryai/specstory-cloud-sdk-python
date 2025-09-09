@@ -3,6 +3,7 @@
 from typing import Any, Dict, List, Optional, cast
 
 from ._base import BaseResource, AsyncBaseResource
+from .._errors import GraphQLError
 
 
 class GraphQL(BaseResource):
@@ -47,7 +48,25 @@ class GraphQL(BaseResource):
             }
         )
         
-        return cast(Dict[str, Any], response.get("data", {}).get("searchSessions", {}))
+        # Check for GraphQL errors
+        if "errors" in response and response["errors"]:
+            raise GraphQLError(
+                "GraphQL query failed",
+                response["errors"],
+                graphql_query,
+                variables
+            )
+        
+        # Check if data is present
+        if "data" not in response or response["data"] is None:
+            raise GraphQLError(
+                "No data returned from GraphQL query",
+                [],
+                graphql_query,
+                variables
+            )
+        
+        return cast(Dict[str, Any], response["data"]["searchSessions"])
     
     def query(self, query: str, variables: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Execute a raw GraphQL query"""
@@ -59,6 +78,16 @@ class GraphQL(BaseResource):
                 "variables": variables or {}
             }
         )
+        
+        # Check for GraphQL errors
+        if "errors" in result and result["errors"]:
+            raise GraphQLError(
+                "GraphQL query failed",
+                result["errors"],
+                query,
+                variables
+            )
+        
         return cast(Dict[str, Any], result)
 
 
@@ -104,7 +133,25 @@ class AsyncGraphQL(AsyncBaseResource):
             }
         )
         
-        return cast(Dict[str, Any], response.get("data", {}).get("searchSessions", {}))
+        # Check for GraphQL errors
+        if "errors" in response and response["errors"]:
+            raise GraphQLError(
+                "GraphQL query failed",
+                response["errors"],
+                graphql_query,
+                variables
+            )
+        
+        # Check if data is present
+        if "data" not in response or response["data"] is None:
+            raise GraphQLError(
+                "No data returned from GraphQL query",
+                [],
+                graphql_query,
+                variables
+            )
+        
+        return cast(Dict[str, Any], response["data"]["searchSessions"])
     
     async def query(self, query: str, variables: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Execute a raw GraphQL query"""
@@ -116,4 +163,14 @@ class AsyncGraphQL(AsyncBaseResource):
                 "variables": variables or {}
             }
         )
+        
+        # Check for GraphQL errors
+        if "errors" in result and result["errors"]:
+            raise GraphQLError(
+                "GraphQL query failed",
+                result["errors"],
+                query,
+                variables
+            )
+        
         return cast(Dict[str, Any], result)
