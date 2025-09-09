@@ -8,6 +8,24 @@ This is the internal development guide for the SpecStory Python SDK. For public 
 - pip or poetry
 - Understanding of sync/async Python
 
+## Quick Local Setup
+
+Want to use the SDK locally right away? Here's the fastest way:
+
+```bash
+# From monorepo root
+pip install -e ./python
+
+# Or with async support
+pip install -e "./python[async]"
+```
+
+That's it! Now you can use the SDK:
+```python
+from specstory import Client
+client = Client(api_key='your-api-key-here')
+```
+
 ## Project Structure
 
 ```
