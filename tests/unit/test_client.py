@@ -72,6 +72,7 @@ class TestAsyncClient:
         assert client.sessions is not None
         assert client.graphql is not None
     
+    @pytest.mark.asyncio
     async def test_async_context_manager(self):
         """AsyncClient should work as context manager"""
         async with AsyncClient(api_key="test-key") as client:
