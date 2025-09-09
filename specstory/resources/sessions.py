@@ -290,6 +290,35 @@ class Sessions(BaseResource):
             return response["sessions"]
         # Fallback for unexpected format
         return response
+    
+    def write_and_read(self, project_id: str, data: Dict[str, Any], **kwargs) -> Dict[str, Any]:
+        """Write and immediately read a session (convenience method)
+        
+        Args:
+            project_id: The project ID
+            data: The session data to write
+            **kwargs: Additional options for write operation
+            
+        Returns:
+            The written session with full details
+            
+        Example:
+            session = client.sessions.write_and_read(project_id, {
+                'events': [...],
+                'metadata': {'clientName': 'test'}
+            })
+        """
+        # First write the session
+        write_result = self.write(project_id, **data, **kwargs)
+        
+        # Then read it back with full details
+        session_id = write_result["session_id"]
+        full_session = self.read(project_id, session_id)
+        
+        if not full_session:
+            raise Exception("Failed to read session after write")
+            
+        return full_session
 
 
 class AsyncSessions(AsyncBaseResource):

@@ -87,6 +87,26 @@ class Projects(BaseResource):
             "deleted_project": parsed.data.deletedProject.model_dump(),
             "deleted_at": parsed.data.deletedAt.isoformat()
         }
+    
+    def get_by_name(self, name: str) -> Optional[Dict[str, Any]]:
+        """Get a project by name (convenience method)
+        
+        Args:
+            name: The project name to search for
+            
+        Returns:
+            The first project with matching name, or None if not found
+            
+        Example:
+            project = client.projects.get_by_name('My Project')
+            if project:
+                print(f"Found project: {project['id']}")
+        """
+        projects = self.list()
+        for project in projects:
+            if project.get('name') == name:
+                return project
+        return None
 
 
 class AsyncProjects(AsyncBaseResource):
