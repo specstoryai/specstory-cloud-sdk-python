@@ -14,10 +14,15 @@ from ..types_generated import (
     DeleteSessionResponse,
     SessionMetadata,
 )
+from .._cache import LRUCache
 
 
 class Sessions(BaseResource):
     """Synchronous sessions resource"""
+    
+    def __init__(self, http_client, cache: Optional[LRUCache] = None):
+        super().__init__(http_client)
+        self._cache = cache
     
     def write(
         self,
@@ -147,6 +152,15 @@ class Sessions(BaseResource):
         Returns:
             Session details with optional ETag, or None if not modified
         """
+        cache_key = f"session:{project_id}:{session_id}"
+        
+        # Check cache if no explicit etag provided
+        if not if_none_match and self._cache:
+            cached_entry = self._cache.get_entry(cache_key)
+            if cached_entry:
+                # Use cached etag for conditional request
+                if_none_match = cached_entry.etag
+        
         headers = {"Accept": "application/json"}
         if if_none_match:
             headers["If-None-Match"] = if_none_match
@@ -163,14 +177,24 @@ class Sessions(BaseResource):
             result = parsed.data.session.model_dump()
             
             # Add ETag if available
-            if "etag" in response_headers:
-                result["etag"] = response_headers["etag"]
+            etag = response_headers.get("etag")
+            if etag:
+                result["etag"] = etag
+                
+            # Cache the response
+            if self._cache and etag:
+                self._cache.set(cache_key, result, etag=etag, ttl=300.0)  # 5 minute TTL
                 
             return result
             
         except Exception as e:
             # Return None for 304 Not Modified
             if hasattr(e, "status_code") and e.status_code == 304:
+                # Return cached version if available
+                if self._cache:
+                    cached = self._cache.get(cache_key)
+                    if cached:
+                        return cached
                 return None
             raise
     
@@ -270,6 +294,10 @@ class Sessions(BaseResource):
 
 class AsyncSessions(AsyncBaseResource):
     """Asynchronous sessions resource"""
+    
+    def __init__(self, http_client, cache: Optional[LRUCache] = None):
+        super().__init__(http_client)
+        self._cache = cache
     
     async def write(
         self,
@@ -399,6 +427,15 @@ class AsyncSessions(AsyncBaseResource):
         Returns:
             Session details with optional ETag, or None if not modified
         """
+        cache_key = f"session:{project_id}:{session_id}"
+        
+        # Check cache if no explicit etag provided
+        if not if_none_match and self._cache:
+            cached_entry = self._cache.get_entry(cache_key)
+            if cached_entry:
+                # Use cached etag for conditional request
+                if_none_match = cached_entry.etag
+        
         headers = {"Accept": "application/json"}
         if if_none_match:
             headers["If-None-Match"] = if_none_match
@@ -415,14 +452,24 @@ class AsyncSessions(AsyncBaseResource):
             result = parsed.data.session.model_dump()
             
             # Add ETag if available
-            if "etag" in response_headers:
-                result["etag"] = response_headers["etag"]
+            etag = response_headers.get("etag")
+            if etag:
+                result["etag"] = etag
+                
+            # Cache the response
+            if self._cache and etag:
+                self._cache.set(cache_key, result, etag=etag, ttl=300.0)  # 5 minute TTL
                 
             return result
             
         except Exception as e:
             # Return None for 304 Not Modified
             if hasattr(e, "status_code") and e.status_code == 304:
+                # Return cached version if available
+                if self._cache:
+                    cached = self._cache.get(cache_key)
+                    if cached:
+                        return cached
                 return None
             raise
     

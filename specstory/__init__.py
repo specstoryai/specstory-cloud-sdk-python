@@ -25,6 +25,8 @@ except ImportError:
     # AsyncClient requires Python 3.8+ with asyncio
     AsyncClient = None  # type: ignore
 
+from ._cache import LRUCache, CacheEntry
+
 __all__ = [
     "Client",
     "AsyncClient",
@@ -40,4 +42,6 @@ __all__ = [
     "GraphQLError",
     "UnknownError",
     "SpecStoryError",
+    "LRUCache",
+    "CacheEntry",
 ]

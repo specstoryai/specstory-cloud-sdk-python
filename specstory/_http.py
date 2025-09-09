@@ -518,6 +518,7 @@ class AsyncHTTPClient:
         timeout_s: Optional[float] = None,
         idempotency_key: Optional[str] = None,
         retries: Optional[int] = None,
+        params: Optional[Dict[str, str]] = None,
     ) -> Tuple[Any, Dict[str, str]]:
         """Make async HTTP request with retry logic and return response with headers"""
         if not self.client:
