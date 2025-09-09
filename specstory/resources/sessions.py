@@ -29,7 +29,8 @@ class Sessions(BaseResource):
         project_name: Optional[str] = None,
         metadata: Optional[SessionMetadata] = None,
         idempotency_key: Optional[str] = None,
-        timeout_ms: Optional[int] = None
+        timeout_ms: Optional[int] = None,
+        session_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """Write (create or update) a session
         
@@ -42,6 +43,7 @@ class Sessions(BaseResource):
             metadata: Optional session metadata
             idempotency_key: Optional idempotency key for request
             timeout_ms: Optional timeout override
+            session_id: Optional session ID (auto-generated if not provided)
             
         Returns:
             Dictionary with session ID, project ID, created_at, and optional ETag
@@ -55,12 +57,16 @@ class Sessions(BaseResource):
             metadata=metadata
         ).model_dump(exclude_none=True)
         
+        # Generate session ID if not provided
+        import uuid
+        sid = session_id or str(uuid.uuid4())
+        
         response, headers = self._request_with_headers(
             method="PUT",
-            path=f"/api/v1/projects/{project_id}/sessions",
+            path=f"/api/v1/projects/{project_id}/sessions/{sid}",
             body=body,
             idempotency_key=idempotency_key,
-            timeout_ms=timeout_ms
+            timeout_s=timeout_ms / 1000 if timeout_ms else None
         )
         
         # Parse response
@@ -263,6 +269,7 @@ class AsyncSessions(AsyncBaseResource):
             metadata: Optional session metadata
             idempotency_key: Optional idempotency key for request
             timeout_ms: Optional timeout override
+            session_id: Optional session ID (auto-generated if not provided)
             
         Returns:
             Dictionary with session ID, project ID, created_at, and optional ETag
@@ -276,12 +283,16 @@ class AsyncSessions(AsyncBaseResource):
             metadata=metadata
         ).model_dump(exclude_none=True)
         
+        # Generate session ID if not provided
+        import uuid
+        sid = session_id or str(uuid.uuid4())
+        
         response, headers = await self._request_with_headers(
             method="PUT",
-            path=f"/api/v1/projects/{project_id}/sessions",
+            path=f"/api/v1/projects/{project_id}/sessions/{sid}",
             body=body,
             idempotency_key=idempotency_key,
-            timeout_ms=timeout_ms
+            timeout_s=timeout_ms / 1000 if timeout_ms else None
         )
         
         # Parse response

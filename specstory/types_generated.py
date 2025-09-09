@@ -23,7 +23,7 @@ class ErrorResponse(BaseModel):
 
 
 class Project(BaseModel):
-    id: UUID
+    id: str  # Changed from UUID - API returns shortened UUIDs
     ownerId: str
     name: str
     icon: str | None = None
@@ -77,7 +77,7 @@ class SessionMetadata(BaseModel):
 
 
 class SessionSummary(BaseModel):
-    id: UUID
+    id: str  # Changed from UUID - API returns shortened UUIDs
     projectId: str
     name: str
     markdownSize: int
@@ -91,7 +91,7 @@ class SessionSummary(BaseModel):
 
 
 class SessionDetail(BaseModel):
-    id: UUID
+    id: str  # Changed from UUID - API returns shortened UUIDs
     projectId: str
     name: str
     markdownContent: str
