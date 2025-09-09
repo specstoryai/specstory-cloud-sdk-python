@@ -4,7 +4,7 @@ Found 2 projects
 Using project: Test Session (833c-d926-f753-7b4a)
 
 Creating a new session...
-Created session: 6c80b825-a3a8-46b1-847b-78a2e06d11aa
+Created session: b8bb3289-2e4b-4984-ae80-81f8969e1e54
 
 Listing sessions...
 Found 2 sessions
@@ -12,11 +12,11 @@ Found 2 sessions
 Reading session details...
 Session name: Test Session
 Markdown size: 47 bytes
-ETag: W/"e5b0e044630deabb66e81ac77b1bcc0e8a5d0a9887fb9d1cdb3ced6e0e5a238a"
+ETag: W/"9c0cfae787915b27f06a811b7613eed5fc02d00eb83b0cef59e1621721b761c8"
 
 Checking session metadata...
 Session exists: True
-Last modified: Tue, 09 Sep 2025 00:13:24 GMT
+Last modified: Tue, 09 Sep 2025 16:27:16 GMT
 
 Deleting session...
 Session deleted: True

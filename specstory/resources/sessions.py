@@ -241,6 +241,29 @@ class Sessions(BaseResource):
             if hasattr(e, "status_code") and e.status_code == 404:
                 return {"exists": False}
             raise
+    
+    def recent(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
+        """Get recent sessions across all projects
+        
+        Args:
+            limit: Number of sessions to return (1-100, default 5)
+            
+        Returns:
+            List of recent session summaries
+        """
+        params = {}
+        if limit is not None:
+            params["limit"] = str(limit)
+        
+        response = self._request(
+            method="GET",
+            path="/api/v1/sessions/recent",
+            params=params
+        )
+        
+        # Parse response
+        parsed = ListSessionsResponse.model_validate(response)
+        return [session.model_dump() for session in parsed.data.sessions]
 
 
 class AsyncSessions(AsyncBaseResource):
@@ -256,7 +279,8 @@ class AsyncSessions(AsyncBaseResource):
         project_name: Optional[str] = None,
         metadata: Optional[SessionMetadata] = None,
         idempotency_key: Optional[str] = None,
-        timeout_ms: Optional[int] = None
+        timeout_ms: Optional[int] = None,
+        session_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """Write (create or update) a session
         
@@ -467,3 +491,26 @@ class AsyncSessions(AsyncBaseResource):
             if hasattr(e, "status_code") and e.status_code == 404:
                 return {"exists": False}
             raise
+    
+    async def recent(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
+        """Get recent sessions across all projects
+        
+        Args:
+            limit: Number of sessions to return (1-100, default 5)
+            
+        Returns:
+            List of recent session summaries
+        """
+        params = {}
+        if limit is not None:
+            params["limit"] = str(limit)
+        
+        response = await self._request(
+            method="GET",
+            path="/api/v1/sessions/recent",
+            params=params
+        )
+        
+        # Parse response
+        parsed = ListSessionsResponse.model_validate(response)
+        return [session.model_dump() for session in parsed.data.sessions]
