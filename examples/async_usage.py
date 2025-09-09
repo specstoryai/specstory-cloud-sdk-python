@@ -5,6 +5,12 @@ import asyncio
 from specstory import AsyncClient
 
 async def main():
+    output = []
+    
+    def log(message):
+        """Log to both console and output list"""
+        print(message)
+        output.append(message)
     # Initialize the async client with your API key
     api_key = os.getenv('SPECSTORY_API_KEY', '')
     

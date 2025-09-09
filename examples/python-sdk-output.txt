@@ -1,0 +1,25 @@
+Fetching projects...
+Found 2 projects
+
+Using project: Test Session (833c-d926-f753-7b4a)
+
+Creating a new session...
+Created session: 6c80b825-a3a8-46b1-847b-78a2e06d11aa
+
+Listing sessions...
+Found 2 sessions
+
+Reading session details...
+Session name: Test Session
+Markdown size: 47 bytes
+ETag: W/"e5b0e044630deabb66e81ac77b1bcc0e8a5d0a9887fb9d1cdb3ced6e0e5a238a"
+
+Checking session metadata...
+Session exists: True
+Last modified: Tue, 09 Sep 2025 00:13:24 GMT
+
+Deleting session...
+Session deleted: True
+
+Searching sessions...
+Search found 7 results
