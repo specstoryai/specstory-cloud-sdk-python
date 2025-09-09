@@ -84,7 +84,7 @@ def demonstrate_error_handling():
         print()
     
     # Test 404 error with valid client
-    api_key = os.getenv('SPECSTORY_API_KEY', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyXzJ0WFdLR2o3cWc3TTRGRHNUZnJZUVJJb3VmSiIsInR5cGUiOiJhcGkiLCJzY29wZSI6WyJyZWFkIiwid3JpdGUiXSwiaWF0IjoxNzU3MzY5MTYyfQ.yGyAXUWfsMysZC9O1FIXDGGzdy0FuzuMP5gv0pu34k8')
+    api_key = os.getenv('SPECSTORY_API_KEY', 'your-api-key-here')
     client = Client(api_key=api_key)
     
     print('Testing 404 error handling...\n')

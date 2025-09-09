@@ -9,7 +9,7 @@ from specstory import Client, AsyncClient
 
 def demonstrate_sync_caching():
     """Show caching features with sync client"""
-    api_key = os.getenv('SPECSTORY_API_KEY', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyXzJ0WFdLR2o3cWc3TTRGRHNUZnJZUVJJb3VmSiIsInR5cGUiOiJhcGkiLCJzY29wZSI6WyJyZWFkIiwid3JpdGUiXSwiaWF0IjoxNzU3MzY5MTYyfQ.yGyAXUWfsMysZC9O1FIXDGGzdy0FuzuMP5gv0pu34k8')
+    api_key = os.getenv('SPECSTORY_API_KEY', 'your-api-key-here')
     
     # Create client with custom cache settings
     client = Client(
@@ -116,7 +116,7 @@ def demonstrate_sync_caching():
 
 async def demonstrate_async_caching():
     """Show caching features with async client"""
-    api_key = os.getenv('SPECSTORY_API_KEY', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyXzJ0WFdLR2o3cWc3TTRGRHNUZnJZUVJJb3VmSiIsInR5cGUiOiJhcGkiLCJzY29wZSI6WyJyZWFkIiwid3JpdGUiXSwiaWF0IjoxNzU3MzY5MTYyfQ.yGyAXUWfsMysZC9O1FIXDGGzdy0FuzuMP5gv0pu34k8')
+    api_key = os.getenv('SPECSTORY_API_KEY', 'your-api-key-here')
     
     async with AsyncClient(api_key=api_key) as client:
         print('6. Async concurrent caching:')

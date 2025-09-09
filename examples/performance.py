@@ -9,7 +9,7 @@ from specstory import Client, AsyncClient
 
 def demonstrate_sync_performance():
     """Show performance features with sync client"""
-    api_key = os.getenv('SPECSTORY_API_KEY', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyXzJ0WFdLR2o3cWc3TTRGRHNUZnJZUVJJb3VmSiIsInR5cGUiOiJhcGkiLCJzY29wZSI6WyJyZWFkIiwid3JpdGUiXSwiaWF0IjoxNzU3MzY5MTYyfQ.yGyAXUWfsMysZC9O1FIXDGGzdy0FuzuMP5gv0pu34k8')
+    api_key = os.getenv('SPECSTORY_API_KEY', 'your-api-key-here')
     client = Client(api_key=api_key)
     
     print('Testing connection reuse with sequential requests...\n')
@@ -43,7 +43,7 @@ def demonstrate_sync_performance():
 
 async def demonstrate_async_performance():
     """Show performance features with async client"""
-    api_key = os.getenv('SPECSTORY_API_KEY', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyXzJ0WFdLR2o3cWc3TTRGRHNUZnJZUVJJb3VmSiIsInR5cGUiOiJhcGkiLCJzY29wZSI6WyJyZWFkIiwid3JpdGUiXSwiaWF0IjoxNzU3MzY5MTYyfQ.yGyAXUWfsMysZC9O1FIXDGGzdy0FuzuMP5gv0pu34k8')
+    api_key = os.getenv('SPECSTORY_API_KEY', 'your-api-key-here')
     
     async with AsyncClient(api_key=api_key) as client:
         print('Testing parallel async requests...\n')
