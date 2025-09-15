@@ -23,6 +23,8 @@ load_dotenv()
 api_key = os.getenv('SPECSTORY_API_KEY', 'your-api-key-here')
 specstory_client = Client(api_key=api_key)
 
+conversation_file = 'all_conversations.json'
+
 
 def list_all_projects():
     """
@@ -173,7 +175,7 @@ def extract_all_conversations() -> List[Dict[str, Any]]:
     return all_data
 
 
-def save_conversations_to_file(data: List[Dict[str, Any]], filename: str = 'extracted_conversations.json') -> str:
+def save_conversations_to_file(data: List[Dict[str, Any]], filename: str = conversation_file) -> str:
     """
     Save extracted conversations to a JSON file
 
@@ -239,10 +241,10 @@ def main():
     # Extract all conversations
     print('\nExtracting conversations from all projects...\n')
     all_data = extract_all_conversations()
-    
+
     # Generate and display summary
     summary = get_conversation_summary(all_data)
-    
+
     print('\n' + '=' * 80)
     print('EXTRACTION SUMMARY')
     print('=' * 80)
@@ -250,7 +252,7 @@ def main():
     print(f"Total Sessions: {summary['total_sessions']}")
     print(f"Total Conversation Turns: {summary['total_conversations']}")
     print(f"Average Turns per Session: {summary['average_turns_per_session']:.2f}")
-    
+
     if summary['most_active_sessions']:
         print('\n' + '-' * 50)
         print('Top 5 Most Active Sessions:')
@@ -260,7 +262,7 @@ def main():
             print(f"   Project: {session['project_name']}")
             print(f"   Turns: {session['total_turns']}")
             print(f"   Last Updated: {session['updated_at']}")
-    
+
     # Save to file (you can use those conversations for other use)
     print('\n' + '-' * 50)
     output_file = save_conversations_to_file(all_data)
