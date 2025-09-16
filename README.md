@@ -1,345 +1,383 @@
-# SpecStory Python SDK - Internal Development Guide
+# SpecStory Python SDK
 
-This is the internal development guide for the SpecStory Python SDK. For public documentation, see `templates/python-sdk/README.md`.
+[![PyPI version](https://badge.fury.io/py/specstory.svg)](https://badge.fury.io/py/specstory)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![codecov](https://codecov.io/gh/specstoryai/specstory-cloud-sdk-python/branch/main/graph/badge.svg)](https://codecov.io/gh/specstoryai/specstory-cloud-sdk-python)
+[![Python Versions](https://img.shields.io/pypi/pyversions/specstory.svg)](https://pypi.org/project/specstory/)
+
+The official Python SDK for the SpecStory API, providing intuitive access to all SpecStory features.
 
 ## Prerequisites
 
-- Python 3.9+ (recommended: use `pyenv`)
-- pip or poetry
-- Understanding of sync/async Python
+Before using this SDK, you'll need:
 
-## Quick Local Setup
+1. **SpecStory Extension**: Install one or more SpecStory extensions in your development environment
+   - Learn more: [SpecStory Introduction](https://docs.specstory.com/specstory/introduction)
+   
+2. **SpecStory Cloud Account**: Create an account to obtain your API key
+   - Quick start guide: [SpecStory Cloud Quickstart](https://docs.specstory.com/cloud/quickstart)
+   - Sign up at: [cloud.specstory.com](https://cloud.specstory.com)
 
-Want to use the SDK locally right away? Here's the fastest way:
+3. **Python**: Version 3.9 or higher
+
+## Installation
+
+### From PyPI (coming soon)
 
 ```bash
-# From monorepo root
-pip install -e ./python
-
-# Or with async support
-pip install -e "./python[async]"
+pip install specstory
 ```
 
-That's it! Now you can use the SDK:
+### From GitHub (for early access)
+
+Until the package is published to PyPI, you can install directly from GitHub:
+
+```bash
+# Install directly from GitHub
+pip install git+https://github.com/specstoryai/specstory-cloud-sdk-python.git
+
+# Or clone and install locally for development
+git clone https://github.com/specstoryai/specstory-cloud-sdk-python.git
+cd specstory-cloud-sdk-python
+pip install -e .
+```
+
+## Quick Start
+
+First, create a `.env` file in your project root:
+```bash
+# .env
+SPECSTORY_API_KEY=your-api-key-here
+```
+
+**Important**: Add `.env` to your `.gitignore` file to keep your API key secure.
+
+Then use the SDK:
+
+```python
+import os
+from specstory import Client
+
+# Load environment variables from .env file
+# You may need to: pip install python-dotenv
+from dotenv import load_dotenv
+load_dotenv()
+
+# Initialize the client with your API key
+# Get your API key from: https://cloud.specstory.com/api-keys
+client = Client(
+    api_key=os.environ["SPECSTORY_API_KEY"],  # Required
+    # Optional: Override base URL for self-hosted instances
+    # base_url="https://cloud.specstory.com"  # Default, override for self-hosted
+)
+
+# Search across sessions
+results = client.graphql.search("error 500")
+print(f"Found {results['total']} results")
+```
+
+## Features
+
+- 🐍 **Pythonic**: Designed with Python best practices and idioms
+- 🔒 **Type-safe**: Full type hints for better IDE support
+- 🚀 **Async support**: Both sync and async clients available
+- 🔄 **Auto-retry**: Built-in retry logic with exponential backoff
+- 📦 **Zero dependencies**: Only requires standard library (httpx for async)
+- 🧪 **Well-tested**: Comprehensive test coverage
+
+## API Reference
+
+### Client Configuration
+
 ```python
 from specstory import Client
-client = Client(api_key='your-api-key-here')
+
+client = Client(
+    api_key: str,                              # Your API key (required)
+    base_url: str = "https://cloud.specstory.com",  # API base URL (default)
+    timeout_s: float = 30.0,                   # Request timeout in seconds
+    cache: dict | bool = None,                # Cache configuration or False to disable
+)
 ```
 
-## Project Structure
-
-```
-python/
-├── specstory/        # Source code
-│   ├── client.py     # Main client implementations (sync/async)
-│   ├── resources/    # API resource implementations
-│   ├── _errors.py    # Error classes
-│   └── _types.py     # Type definitions
-├── tests/            # Test files
-├── examples/         # Example usage scripts
-├── build/            # Build artifacts (git-ignored)
-└── htmlcov/          # Coverage reports (git-ignored)
-```
-
-## Getting Started
-
-### 1. Set Up Virtual Environment
-
-```bash
-cd python
-
-# Create virtual environment
-python -m venv venv
-
-# Activate it
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Upgrade pip
-pip install --upgrade pip
-```
-
-### 2. Install Dependencies
-
-```bash
-# Install in development mode with all extras
-pip install -e ".[dev,test,async]"
-```
-
-### 3. Set Up Environment
-
-Create a `.env` file (copy from `.env.example`):
-```bash
-cp .env.example .env
-# Edit .env and add your API key
-SPECSTORY_API_KEY=your-actual-api-key-here
-```
-
-### 4. Run Tests
-
-```bash
-# Run all tests
-pytest
-
-# Run with coverage
-pytest --cov=specstory --cov-report=html
-
-# Run only unit tests
-pytest tests/unit/
-
-# Run only integration tests (requires API key)
-pytest tests/integration/
-
-# Run specific test file
-pytest tests/unit/test_client.py
-
-# Run with verbose output
-pytest -v
-
-# Run tests matching a pattern
-pytest -k "test_error"
-```
-
-### 5. Linting and Formatting
-
-```bash
-# Run all linting
-ruff check specstory tests
-
-# Fix linting issues
-ruff check --fix specstory tests
-
-# Format code with black
-black specstory tests
-
-# Type check with mypy
-mypy specstory
-
-# Run all checks at once
-make lint  # if Makefile exists
-```
-
-## Development Workflow
-
-### Running Examples
-
-```bash
-# Run any example directly
-python examples/basic_usage.py
-
-# With environment variable
-SPECSTORY_API_KEY=your-key python examples/error_handling.py
-
-# Run async examples
-python examples/async_usage.py
-```
-
-### Testing Your Changes
-
-1. **Unit Testing**: Write tests in `tests/unit/`
-   ```python
-   # tests/unit/test_my_feature.py
-   import pytest
-   from specstory import my_feature
-   
-   def test_my_feature_works():
-       result = my_feature()
-       assert result == expected_value
-   
-   @pytest.mark.asyncio
-   async def test_async_feature():
-       result = await async_feature()
-       assert result == expected_value
-   ```
-
-2. **Integration Testing**: Write tests in `tests/integration/`
-   - Requires valid API key
-   - Tests against real API
-   - Use fixtures for setup/teardown
-
-### Local Development
-
-To use the SDK locally in another project:
-
-```bash
-# Install in editable mode
-pip install -e /path/to/specstory-cloud-sdk/python
-
-# Or using pip link equivalent
-pip install -e ../specstory-cloud-sdk/python
-```
-
-### Debugging
-
-1. **Enable Debug Logging**:
-   ```python
-   import logging
-   logging.basicConfig(level=logging.DEBUG)
-   
-   from specstory import Client
-   client = Client(api_key="your-key", debug=True)
-   ```
-
-2. **IPython/Jupyter**:
-   ```python
-   %load_ext autoreload
-   %autoreload 2
-   
-   from specstory import Client
-   client = Client(api_key="your-key")
-   ```
-
-3. **VS Code Launch Config** (`.vscode/launch.json`):
-   ```json
-   {
-     "version": "0.2.0",
-     "configurations": [
-       {
-         "name": "Python: Current File",
-         "type": "python",
-         "request": "launch",
-         "program": "${file}",
-         "console": "integratedTerminal",
-         "env": {
-           "SPECSTORY_API_KEY": "your-key-here"
-         }
-       }
-     ]
-   }
-   ```
-
-## Build and Distribution
-
-### Building the Package
-
-```bash
-# Install build tools
-pip install build twine
-
-# Build distribution packages
-python -m build
-
-# Check the build
-twine check dist/*
-```
-
-### Package Structure
-
-The build creates:
-- `dist/*.whl` - Wheel distribution
-- `dist/*.tar.gz` - Source distribution
-- `build/` - Intermediate build files
-
-## API Key Management
-
-**Never commit API keys!**
-
-- Use environment variables
-- Use `.env` files (git-ignored)
-- For CI/CD, use GitHub secrets
-- Consider using `python-dotenv`:
-  ```python
-  from dotenv import load_dotenv
-  load_dotenv()
-  ```
-
-## Common Issues
-
-### Import Errors
-
-```bash
-# Reinstall in development mode
-pip install -e ".[dev]"
-```
-
-### Async Errors
-
-```bash
-# Make sure httpx is installed
-pip install -e ".[async]"
-```
-
-### Type Checking Issues
-
-```bash
-# Regenerate type stubs
-stubgen -p specstory -o stubs/
-```
-
-## Publishing (Internal)
-
-**Do NOT publish directly to PyPI!** Use the release workflow:
-
-1. Update version in `pyproject.toml`
-2. Push to main branch
-3. The sync workflow handles publishing
-
-## Performance Testing
+### Async Client
 
 ```python
-# Run performance benchmarks
-python -m pytest tests/performance/ --benchmark-only
-
-# Profile a specific operation
-python -m cProfile -o profile.stats examples/performance.py
-```
-
-## Async vs Sync
-
-The SDK provides both sync and async clients:
-
-```python
-# Sync (default)
-from specstory import Client
-client = Client(api_key="key")
-projects = client.projects.list()
-
-# Async
 from specstory import AsyncClient
-async with AsyncClient(api_key="key") as client:
+import asyncio
+
+async def main():
+    client = AsyncClient(api_key="your-api-key")
+    
+    # All methods are async
     projects = await client.projects.list()
+    
+    # Don't forget to close the client
+    await client.close()
+
+asyncio.run(main())
 ```
 
-Choose based on your application:
-- Sync: Simple scripts, Flask, Django
-- Async: FastAPI, aiohttp, async applications
+### Projects
+
+```python
+# List projects
+projects = client.projects.list(page=1, limit=10)
+
+# Get a project
+project = client.projects.get(project_id)
+
+# Create a project
+project = client.projects.create(
+    name="Project Name",
+    description="Project description"
+)
+
+# Update a project
+project = client.projects.update(
+    project_id,
+    name="New Name"
+)
+
+# Delete a project
+client.projects.delete(project_id)
+```
+
+### Sessions
+
+```python
+# List sessions for a project
+sessions = client.sessions.list(project_id)
+
+# Read a specific session
+session = client.sessions.read(project_id, session_id)
+if session:
+    print(f"Session name: {session['name']}")
+    print(f"Markdown size: {session['markdownSize']} bytes")
+
+# Get recent sessions across all projects
+recent_sessions = client.sessions.recent(10)
+
+# Delete a session
+client.sessions.delete(project_id, session_id)
+
+# Get session metadata without content
+metadata = client.sessions.head(project_id, session_id)
+if metadata and metadata['exists']:
+    print(f"Last modified: {metadata['lastModified']}")
+```
+
+### GraphQL Search
+
+```python
+# Search across all sessions
+results = client.graphql.search("error 500", 
+    limit=20,
+    filters={
+        "projectId": "specific-project-id",
+        "tags": ["production"]
+    }
+)
+
+print(f"Found {results['total']} matches")
+for result in results['results']:
+    print(f"{result['name']} (rank: {result['rank']})")
+
+```
+
+### Error Handling
+
+The SDK provides typed exceptions for better error handling:
+
+```python
+from specstory import Client, SpecStoryError, ValidationError
+
+try:
+    session = client.sessions.read(project_id, session_id)
+except ValidationError as e:
+    # Handle validation errors
+    print(f"Validation failed: {e.errors}")
+except SpecStoryError as e:
+    # Handle other API errors
+    print(f"API error: {e.message}")
+except Exception as e:
+    # Handle unexpected errors
+    print(f"Unexpected error: {e}")
+```
+
+## Advanced Usage
+
+### Context Manager
+
+```python
+from specstory import Client
+
+# Client automatically closes connections
+with Client(api_key="your-api-key") as client:
+    projects = client.projects.list()
+```
+
+### Custom Headers
+
+```python
+client = Client(
+    api_key="your-api-key",
+    headers={
+        "X-Custom-Header": "value"
+    }
+)
+```
+
+### Timeout Configuration
+
+```python
+client = Client(
+    api_key="your-api-key",
+    timeout=60.0  # 60 seconds
+)
+```
+
+### Pagination
+
+```python
+# Use the paginated iterator for sessions
+for session in client.sessions.list_paginated(project_id):
+    print(f"Session: {session['name']}")
+    # Process each session without loading all into memory
+```
+
+### Convenience Methods
+
+```python
+# Get project by name
+project = client.projects.get_by_name("My Project")
+if project:
+    print(f"Found project: {project['id']}")
+```
+
+## Async Usage
+
+```python
+import asyncio
+from specstory import AsyncClient
+
+async def main():
+    async with AsyncClient(api_key="your-api-key") as client:
+        # All methods are async versions of sync client
+        projects = await client.projects.list()
+        
+        # Search asynchronously
+        results = await client.graphql.search("error")
+        print(f"Found {results['total']} results")
+        
+        # Concurrent requests
+        sessions, recent = await asyncio.gather(
+            client.sessions.list(projects[0]['id']),
+            client.sessions.recent(5)
+        )
+
+asyncio.run(main())
+```
 
 ## Contributing
 
-1. Create feature branch from `main`
-2. Add tests for new functionality
-3. Ensure all tests pass
-4. Run linting and formatting
-5. Submit PR with description
+We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
 
-## Commands Reference
+### Development Setup
 
-| Command | Description |
-|---------|-------------|
-| `pytest` | Run all tests |
-| `pytest --cov=specstory` | Run with coverage |
-| `black specstory tests` | Format code |
-| `ruff check specstory` | Lint code |
-| `mypy specstory` | Type check |
-| `python -m build` | Build package |
-| `pip install -e ".[dev]"` | Install for development |
+```bash
+# Clone the repository
+git clone https://github.com/specstoryai/specstory-cloud-sdk-python.git
+cd specstory-cloud-sdk-python
 
-## Architecture Notes
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 
-- **Client Design**: Separate sync/async implementations
-- **Resources**: Shared resource classes with sync/async methods
-- **Error Handling**: Rich exception hierarchy with context
-- **Type Safety**: Full typing with Python 3.9+ features
-- **Zero Dependencies**: Core has no deps, async needs httpx
+# Install development dependencies
+pip install -e ".[dev]"
 
-## Testing Strategy
+# Run tests
+pytest
 
-- **Mocking**: Use `pytest-httpx` for async tests
-- **Fixtures**: Shared fixtures in `conftest.py`
-- **Markers**: `@pytest.mark.integration` for real API tests
-- **Coverage**: Aim for >90% coverage
+# Run linting
+ruff check specstory tests
+black --check specstory tests
+```
 
-## Questions?
+## Requirements
 
-- Check `docs/` for design decisions
-- Review examples in `examples/`
-- Ask in #sdk-development Slack channel
+- Python 3.9 or higher
+- No runtime dependencies for sync client
+- httpx for async client (installed automatically with `pip install specstory[async]`)
+
+## Advanced Usage
+
+### Caching
+
+```python
+# Enable caching (default)
+client = Client(
+    api_key="your-api-key",
+    cache={
+        "max_size": 200,      # Cache up to 200 items
+        "default_ttl": 600.0  # 10 minutes
+    }
+)
+
+# Disable caching
+no_cache = Client(
+    api_key="your-api-key",
+    cache=False
+)
+```
+
+### Conditional Requests with ETags
+
+```python
+# First read
+session = client.sessions.read(project_id, session_id)
+etag = session.get('etag') if session else None
+
+# Later, check if changed
+updated = client.sessions.read(project_id, session_id, if_none_match=etag)
+if updated is None:
+    print("Session has not changed")
+```
+
+### Request Timeouts
+
+```python
+# Set default timeout
+client = Client(
+    api_key="your-api-key",
+    timeout_s=60.0  # 60 seconds
+)
+
+# Override for specific request
+client.sessions.write(
+    project_id,
+    name="Large Session",
+    markdown="# Big content...",
+    raw_data=large_json_data,
+    timeout_s=120.0  # 2 minutes for large uploads
+)
+```
+
+## License
+
+This SDK is distributed under the Apache License 2.0. See [LICENSE](LICENSE) for more information.
+
+## Support
+
+- 📧 Email: support@specstory.com
+- 💬 Community: [Join our Slack](https://specstory.slack.com/join/shared_invite/zt-2vq0274ck-MYS39rgOpDSmgfE1IeK9gg#/shared-invite/email)
+- 📖 Documentation: [docs.specstory.com](https://docs.specstory.com)
+- 🐛 Issues: [GitHub Issues](https://github.com/specstoryai/specstory-cloud-sdk-python/issues)
+
+## Links
+
+- [PyPI Package](https://pypi.org/project/specstory/)
+- [GitHub Repository](https://github.com/specstoryai/specstory-cloud-sdk-python)
+- [API Documentation](https://docs.specstory.com/api)
+- [Examples](https://github.com/specstoryai/specstory-cloud-sdk-python/tree/main/examples)
